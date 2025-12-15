@@ -1,102 +1,106 @@
 <?php
 /**
  * sbackend/logic.php
- * Chứa toàn bộ logic xử lý CRUD.
+ * Chứa toàn bộ logic xử lý CRUD với prepared statements để tăng cường bảo mật.
  */
 
-// Đường dẫn tương đối để gọi db_config.php từ file này:
 require_once 'db_config.php'; 
 
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-function safe_input($conn, $data) {
-    return $conn->real_escape_string($data);
-}
-
-// Khởi tạo biến để tránh lỗi NULL:
+// Khởi tạo biến
 $tenmon = "";
 $soluong = 0;
 $mota = "";
-$mamon_edit = ""; // SỬA LỖI: Khởi tạo là chuỗi rỗng thay vì null
+$mamon_edit = "";
 $error = null;
 $msg = null;
+$search_term = $_GET['search'] ?? '';
 
 // --- Xử lý chức năng XÓA (DELETE) ---
 if (isset($_GET['delete'])) {
-    $mamon = safe_input($conn, $_GET['delete']);
-    $sql_delete = "DELETE FROM monan WHERE mamon = '$mamon'";
-    if ($conn->query($sql_delete) === TRUE) {
+    $mamon = $_GET['delete'];
+    $stmt = $conn->prepare("DELETE FROM monan WHERE mamon = ?");
+    $stmt->bind_param("i", $mamon);
+    if ($stmt->execute()) {
         $_SESSION['msg'] = "Xóa món ăn thành công!";
     } else {
-        $_SESSION['error'] = "Lỗi khi xóa món: " . $conn->error;
+        $_SESSION['error'] = "Lỗi khi xóa món: " . $stmt->error;
     }
-    // CHUYỂN HƯỚNG ĐÚNG: Quay về thư mục frontend/
-    header("Location: frontend/index.php"); 
+    $stmt->close();
+    header("Location: index.php"); 
     exit();
 }
 
 // --- Xử lý chức năng CHUẨN BỊ SỬA (PREPARE EDIT) ---
 if (isset($_GET['edit'])) {
-    $mamon_edit_get = safe_input($conn, $_GET['edit']);
-    $sql_select_edit = "SELECT * FROM monan WHERE mamon = '$mamon_edit_get'";
-    $result_edit = $conn->query($sql_select_edit);
+    $mamon_edit_get = $_GET['edit'];
+    $stmt = $conn->prepare("SELECT tenmon, soluong, mota, mamon FROM monan WHERE mamon = ?");
+    $stmt->bind_param("i", $mamon_edit_get);
+    $stmt->execute();
+    $result_edit = $stmt->get_result();
     
-    if ($result_edit && $result_edit->num_rows == 1) {
+    if ($result_edit->num_rows == 1) {
         $row = $result_edit->fetch_assoc();
         $tenmon = $row['tenmon'];
         $soluong = $row['soluong'];
         $mota = $row['mota'];
-        $mamon_edit = $row['mamon']; // Gán ID đã lấy được
+        $mamon_edit = $row['mamon'];
     } else {
         $_SESSION['error'] = "Không tìm thấy món ăn cần sửa.";
-        header("Location: frontend/index.php");
+        header("Location: index.php");
         exit();
     }
+    $stmt->close();
 }
-
 
 // --- Xử lý chức năng THÊM / CẬP NHẬT (CREATE / UPDATE) ---
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $tenmon_post = safe_input($conn, $_POST['tenmon']);
-    $soluong_post = safe_input($conn, $_POST['soluong']);
-    $mota_post = safe_input($conn, $_POST['mota']);
-    $mamon_post = safe_input($conn, $_POST['mamon'] ?? ''); // Lấy ID, nếu không có sẽ là chuỗi rỗng
+    $tenmon_post = $_POST['tenmon'] ?? '';
+    $soluong_post = $_POST['soluong'] ?? 0;
+    $mota_post = $_POST['mota'] ?? '';
+    $mamon_post = $_POST['mamon'] ?? '';
 
     if (empty($tenmon_post) || empty($soluong_post) || empty($mota_post)) {
         $_SESSION['error'] = "Vui lòng điền đầy đủ thông tin.";
-    } elseif (!empty($mamon_post)) {
-        // CẬP NHẬT (UPDATE)
-        $sql = "UPDATE monan SET tenmon='$tenmon_post', soluong='$soluong_post', mota='$mota_post' WHERE mamon='$mamon_post'";
-        $success_msg = "Cập nhật món ăn thành công!";
     } else {
-        // THÊM MỚI (CREATE)
-        $sql = "INSERT INTO monan (tenmon, soluong, mota) VALUES ('$tenmon_post', '$soluong_post', '$mota_post')";
-        $success_msg = "Thêm món ăn thành công!";
-    }
+        if (!empty($mamon_post)) {
+            // CẬP NHẬT (UPDATE)
+            $stmt = $conn->prepare("UPDATE monan SET tenmon = ?, soluong = ?, mota = ? WHERE mamon = ?");
+            $stmt->bind_param("sisi", $tenmon_post, $soluong_post, $mota_post, $mamon_post);
+            $success_msg = "Cập nhật món ăn thành công!";
+        } else {
+            // THÊM MỚI (CREATE)
+            $stmt = $conn->prepare("INSERT INTO monan (tenmon, soluong, mota) VALUES (?, ?, ?)");
+            $stmt->bind_param("sis", $tenmon_post, $soluong_post, $mota_post);
+            $success_msg = "Thêm món ăn thành công!";
+        }
 
-    if (!isset($_SESSION['error'])) {
-        if ($conn->query($sql) === TRUE) {
+        if ($stmt->execute()) {
             $_SESSION['msg'] = $success_msg;
         } else {
-            $_SESSION['error'] = "Lỗi xử lý database: " . $conn->error;
+            $_SESSION['error'] = "Lỗi xử lý database: " . $stmt->error;
         }
+        $stmt->close();
     }
-    // CHUYỂN HƯỚNG ĐÚNG: Quay về thư mục frontend/
-    header("Location: frontend/index.php"); 
+    
+    header("Location: index.php"); 
     exit();
 }
 
 // --- Xử lý chức năng ĐỌC/TÌM KIẾM (READ / SEARCH) ---
-$search_term = safe_input($conn, $_GET['search'] ?? '');
-$where_clause = "";
 if (!empty($search_term)) {
-    $where_clause = " WHERE tenmon LIKE '%$search_term%' OR mota LIKE '%$search_term%'";
+    $search_param = "%" . $search_term . "%";
+    $stmt = $conn->prepare("SELECT mamon, tenmon, soluong, mota FROM monan WHERE tenmon LIKE ? OR mota LIKE ? ORDER BY mamon DESC");
+    $stmt->bind_param("ss", $search_param, $search_param);
+} else {
+    $stmt = $conn->prepare("SELECT mamon, tenmon, soluong, mota FROM monan ORDER BY mamon DESC");
 }
-
-$sql_select = "SELECT mamon, tenmon, soluong, mota FROM monan" . $where_clause . " ORDER BY mamon DESC";
-$result_list = $conn->query($sql_select);
+$stmt->execute();
+$result_list = $stmt->get_result();
+$stmt->close();
 
 // --- Lấy thông báo sau khi chuyển hướng ---
 if (isset($_SESSION['msg'])) {
@@ -108,5 +112,6 @@ if (isset($_SESSION['error'])) {
     unset($_SESSION['error']);
 }
 
-$conn->close();
+// Không đóng kết nối ở đây, vì nó sẽ được dùng bởi file frontend
+// $conn->close();
 ?>
