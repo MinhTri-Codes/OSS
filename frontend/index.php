@@ -45,7 +45,7 @@ require_once '../sbackend/logic.php';
 <body>
 
     <div class="container">
-        <h1>🍽️ Quản Lý Thực Đơn (Frontend/Backend Tách Biệt)</h1>
+        <h1>🍽️ Quản Lý Thực Đơn</h1>
 
         <?php 
         // HIỂN THỊ THÔNG BÁO LỖI HOẶC THÀNH CÔNG
