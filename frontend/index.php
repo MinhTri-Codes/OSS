@@ -129,5 +129,7 @@ require_once '../sbackend/logic.php';
             </table>
         </div>
     </div>
+    
+    <?php $conn->close(); ?>
 </body>
 </html>
