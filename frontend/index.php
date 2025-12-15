@@ -46,7 +46,7 @@ require_once '../sbackend/logic.php';
 
     <div class="container">
         <h1>🍽️ Quản Lý Thực Đơn</h1>
-
+        <h1>Lê Hoàng Minh Trí DH52201618</h1>
         <?php 
         // HIỂN THỊ THÔNG BÁO LỖI HOẶC THÀNH CÔNG
         if ($error) {
