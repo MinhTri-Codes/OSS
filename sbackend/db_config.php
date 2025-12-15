@@ -5,10 +5,10 @@
  */
 
 // THÔNG TIN KẾT NỐI DATABASE (Bạn cần thay thế các giá trị sau)
-define('DB_SERVER', 'sql313.infinityfree.com'); 
-define('DB_USERNAME', 'if0_40683473');    
-define('DB_PASSWORD', 'Ue3jwnEcEl'); 
-define('DB_NAME', 'if0_40683473_XXX'); 
+define('DB_SERVER', 'sql202.infinityfree.com'); 
+define('DB_USERNAME', 'if0_40685953');    
+define('DB_PASSWORD', 'SclyNBdU8S'); 
+define('DB_NAME', 'if0_40685953_monan'); 
 
 // Tạo kết nối
 $conn = new mysqli(DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_NAME);
